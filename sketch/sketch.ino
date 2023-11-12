@@ -1,6 +1,4 @@
-#include <GRGB.h>
-
-#include <ESPDMX.h>
+#include <ESPDMX.h>  // https://github.com/Rickgg/ESP-Dmx
 DMXESPSerial dmx;
 
 // Connect GPIO02 - TDX1 to MAX3485. D4
@@ -10,12 +8,10 @@ DMXESPSerial dmx;
 //#define AP_SSID "Krop9"
 //#define AP_PASS "0964946190"
 
-#include <GyverPortal.h>
+#include <GyverPortal.h> // https://github.com/GyverLibs/GyverPortal
 GyverPortal ui;
 
 #define pinOut 9        //указать пин управления, где есть шим
-#define lights_pcs 2    //количество прожекторов
-#define number_channels 8    //количество каналов
 
 byte min_val = 0;
 byte max_val = 255;
@@ -34,8 +30,10 @@ int function_choice = 215;
 
 bool flagLed1 = 1;
 bool flagLed2 = 1;
-bool flagRainbowLed = 0;
-bool flag_strobe = 1;
+bool flagFullWhite = 0;
+bool flagFullWhite_check = 0;
+bool flagRainbowLed = 1;
+bool flag_strobe = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -51,9 +49,9 @@ void setup() {
   ui.attachBuild(build);
   ui.attach(action);
   ui.start();
-  dmx.init(lights_pcs * number_channels);
+  dmx.init(16);
   dmx.write(1, main_brightness);
-  dmx.write(1 + number_channels, main_brightness);
+  dmx.write(9, main_brightness);
   dmx.write(7, function_choice);
   dmx.write(15, function_choice);
   dmx.update();
@@ -61,7 +59,6 @@ void setup() {
 
 void build() {
   GP.BUILD_BEGIN(GP_DARK);
-
   M_BOX(GP.BUTTON_MINI("Button_1_light", "1", "", GP_GREEN, "", 0, 1);
         GP.LED_GREEN("Led_1_light", flagLed1);
         GP.LABEL_BLOCK("  ");
@@ -72,20 +69,21 @@ void build() {
   M_BOX(GP.BUTTON_MINI("Switchoff_button", "Выкл.всё", "", GP_GRAY, "", 0, 1);
         GP.LABEL_BLOCK("  ");
         GP.BUTTON_MINI("White_button", "Белый", "", GP_GRAY_B, "", 0, 1);
+        GP.LED_GREEN("Led_fullWhite", flagFullWhite);
         GP.LABEL_BLOCK("  ");
         GP.BUTTON_MINI("Rainbow_button", "Радуга", "", GP_PINK, "", 0, 1);
-        GP.LED_RED("Led_rainbow", !flagRainbowLed);
+        GP.LED_GREEN("Led_rainbow", flagRainbowLed);
        );
 
   M_BLOCK_THIN(
     M_BOX(GP.LABEL("Главная яркость"); GP.BREAK(); );
-    M_BOX(GP.SLIDER_C("MainBrightness_slider", main_brightness, min_val, max_val, step_slider, 0, GP_VIOL); );   // яркость RGBW
+    M_BOX(GP.SLIDER_C("MainBrightness_slider", main_brightness, min_val, max_val, step_slider, 0, GP_VIOL); );   // главная яркость
     M_BOX(GP.HR(); );
     M_BOX(GP.LABEL("Палитра 1"); GP.BREAK(); );
-    M_BOX(GP.SLIDER_C("Palitra_slider_1", palitra_value_1, min_val, 1530, step_slider, 0, GP_ORANGE); );            // функциональный выбор
+    M_BOX(GP.SLIDER_C("Palitra_slider_1", palitra_value_1, min_val, 1530, 6, 0, GP_ORANGE); );
     M_BOX(GP.HR(); );
     M_BOX(GP.LABEL("Палитра 2"); GP.BREAK(); );
-    M_BOX(GP.SLIDER_C("Palitra_slider_2", palitra_value_2, min_val, 1530, step_slider, 0, GP_BLUE); );            // функциональный выбор
+    M_BOX(GP.SLIDER_C("Palitra_slider_2", palitra_value_2, min_val, 1530, 6, 0, GP_BLUE); );
     M_BOX(GP.HR(); );
     M_BOX(GP.LABEL("Белый"); GP.BREAK(); );
     M_BOX(GP.SLIDER_C("White_slider", white_brightness, min_val, max_val, step_slider, 0, GP_GRAY_B); );         // яркость W
@@ -93,7 +91,7 @@ void build() {
     M_BOX(GP.LABEL("Радуга"); GP.BREAK(); );
     M_BOX(GP.SLIDER_C("Function_slider", function_choice, rain_min, max_val, 1, 0, GP_PINK); );            // функциональный выбор
     M_BOX(GP.HR(); );
-    M_BOX(GP.LABEL("Стробоскоп"); GP.BUTTON_MINI("Button_strobe", "OnOff", "", GP_YELLOW, "", 0, 1); GP.LED_RED("Led_strobe", !flag_strobe); GP.BREAK(); );
+    M_BOX(GP.LABEL("Стробоскоп"); GP.BUTTON_MINI("Button_strobe", "OnOff", "", GP_YELLOW, "", 0, 1); GP.LED_RED("Led_strobe", flag_strobe); GP.BREAK(); );
     M_BOX(GP.SLIDER_C("Strobe_slider", strobe, min_val, max_val, step_slider, 0, GP_YELLOW); );                // стробоскоп
   );
 
@@ -116,12 +114,10 @@ void action() {
     }
 
     else if (ui.click("Switchoff_button")) {
-      palitra_value_1 = 0;
-      palitra_value_2 = 0;
-      flagRainbowLed = 1;
+      flagRainbowLed = 0;
       function_choice = 211;
       white_brightness = 0;
-      flag_strobe = 1;
+      flag_strobe = 0;
       strobe = 0;
       dmx.write(2, 0);
       dmx.write(3, 0);
@@ -138,78 +134,103 @@ void action() {
     }
 
     else if (ui.click("White_button")) {
-      flagRainbowLed = 1;
-      white_brightness = max_val;
-      dmx.write(7, 0);
-      dmx.write(15, 0);
-      dmx.write(2, max_val);
-      dmx.write(3, max_val);
-      dmx.write(4, max_val);
-      dmx.write(5, max_val);
-      dmx.write(10, max_val);
-      dmx.write(11, max_val);
-      dmx.write(12, max_val);
-      dmx.write(13, max_val);
+      flagFullWhite = !flagFullWhite;
+      if (flagFullWhite) {
+        if (flagRainbowLed) {
+          flagRainbowLed = 0;
+          flagFullWhite_check = 1;
+          dmx.write(7, 0);
+          dmx.write(15, 0);
+        }
+        white_brightness = max_val;
+        dmx.write(2, max_val);
+        dmx.write(3, max_val);
+        dmx.write(4, max_val);
+        dmx.write(5, white_brightness);
+        dmx.write(10, max_val);
+        dmx.write(11, max_val);
+        dmx.write(12, max_val);
+        dmx.write(13, white_brightness);
+      }
+      else {
+        if (flagFullWhite_check) {
+          flagRainbowLed = 1;
+          dmx.write(7, function_choice);
+          dmx.write(15, function_choice);
+          flagFullWhite_check = 0;
+        }
+        white_brightness = min_val;
+        dmx.write(7, function_choice);
+        dmx.write(15, function_choice);
+        colorWheel_1(palitra_value_1);
+        colorWheel_2(palitra_value_2);
+        dmx.write(5, white_brightness);
+        dmx.write(13, white_brightness);
+      }
     }
 
     else if (ui.click("Rainbow_button")) {
       flagRainbowLed = !flagRainbowLed;
-      if (flagRainbowLed == 0) {
+      if (flagRainbowLed == 1) {
         dmx.write(7, function_choice);
         dmx.write(15, function_choice);
       }
-      else if (flagRainbowLed == 1) {
+      else if (flagRainbowLed == 0) {
         dmx.write(7, 0);
         dmx.write(15, 0);
       }
     }
+
     else if (ui.clickInt("MainBrightness_slider", main_brightness)) {
-      for (int i = 1 + changer1; i <= lights_pcs * 8; i = i + 8 + changer2) {
+      for (int i = 1 + changer1; i <= 16; i = i + 8 + changer2) {
         dmx.write(i, main_brightness);
       }
     }
 
     else if (ui.clickInt("Palitra_slider_1", palitra_value_1)) {
-        colorWheel_1(palitra_value_1);
+      colorWheel_1(palitra_value_1);
     }
-    
+
     else if (ui.clickInt("Palitra_slider_2", palitra_value_2)) {
-        colorWheel_2(palitra_value_2);
+      colorWheel_2(palitra_value_2);
     }
 
     else if (ui.clickInt("White_slider", white_brightness)) {
-      for (int i = 5 + changer1; i <= lights_pcs * 8; i = i + 8 + changer2) {
+      for (int i = 5 + changer1; i <= 16; i = i + 8 + changer2) {
         dmx.write(i, white_brightness);
       }
     }
+
     else if (ui.clickInt("Function_slider", function_choice)) {
       if (flagRainbowLed == 0) {
-        for (int i = 7 + changer1; i <= lights_pcs * 8; i = i + 8 + changer2) {
+        for (int i = 7 + changer1; i <= 16; i = i + 8 + changer2) {
           dmx.write(i, function_choice);
+        }
+      }
+    }
+
+    else if (ui.clickInt("Strobe_slider", strobe)) {
+      if (flag_strobe == 1) {
+        for (int i = 6 + changer1; i <= 16; i = i + 8 + changer2) {
+          dmx.write(i, strobe);
         }
       }
     }
     else if (ui.click("Button_strobe")) {
       flag_strobe = !flag_strobe;
-      if (flag_strobe == 1) {
+      if (flag_strobe == 0) {
         dmx.write(6, 0);
         dmx.write(14, 0);
       }
-      else if (flag_strobe == 0) {
+      else if (flag_strobe == 1) {
         dmx.write(6, strobe);
         dmx.write(14, strobe);
       }
     }
 
-    else if (ui.clickInt("Strobe_slider", strobe)) {
-      if (flag_strobe == 0) {
-        for (int i = 6 + changer1; i <= lights_pcs * 8; i = i + 8 + changer2) {
-          dmx.write(i, strobe);
-        }
-      }
-    }
   }
 }
+
 void loop() {
   ui.tick();
   dmx.update();
