@@ -2,8 +2,8 @@
 DMXESPSerial dmx;
 
 // Connect GPIO02 - TDX1 to MAX3485. D4
-#define AP_SSID "DoNotConnect"
-#define AP_PASS "Netparolja123"
+#define AP_SSID ""
+#define AP_PASS ""
 
 //#define AP_SSID "Krop9"
 //#define AP_PASS "0964946190"
