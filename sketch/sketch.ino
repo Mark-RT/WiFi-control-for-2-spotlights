@@ -160,8 +160,6 @@ void action() {
           flagFullWhite_check = 0;
         }
         white_brightness = min_val;
-        dmx.write(7, function_choice);
-        dmx.write(15, function_choice);
         colorWheel_1(palitra_value_1);
         colorWheel_2(palitra_value_2);
         dmx.write(5, white_brightness);
